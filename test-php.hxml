@@ -1,0 +1,7 @@
+-main test.TestIntrospector
+-lib thx
+-lib utest
+-cp src
+
+-php C:\wamp\www\introspector\tests
+

@@ -1,0 +1,7 @@
+-main test.TestIntrospector
+-lib thx
+-lib utest
+-cp src
+
+-js C:\src\introspector\out\introspector_test.js
+

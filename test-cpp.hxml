@@ -1,0 +1,7 @@
+-main test.TestIntrospector
+-lib thx
+-lib utest
+-cp src
+
+-cpp C:\src\introspector\out\cpp
+

@@ -1,0 +1,5 @@
+-main Main
+-lib thx
+-cp src
+-neko C:\src\introspector\out\introspector.n
+-xml introspector.xml
