@@ -2,6 +2,7 @@ package introspector;
 import haxe.macro.Expr;
 import haxe.macro.Context;
 import thx.validation.StringLengthValidator;
+import tink.macro.tools.TypeTools;
 using Arrays;
 class Builder {
     private static function getVarTypeName(field:Field){
@@ -27,11 +28,19 @@ class Builder {
         var type="";    
         switch (runtimeType){
             case TPath(t2) :
-                type=t2.pack.join(".");
-                if (type!=null && type!="")
-                    type+=".";
+                //if (t2.pack!=null){
+               
+                    type=t2.pack.join(".");
+                    if (type!=null && type!="")
+                        type+=".";
+                //}
                 
-                type+= t2.name;
+                if (t2.name=="StdTypes" && t2.sub!=null && t2.sub!=""){
+                    type+= t2.sub;
+                } else
+                    type+= t2.name;
+                
+                
                 if (t2.params.length>0){
                     type+= "<";
                     for (param in t2.params)    
@@ -52,6 +61,7 @@ class Builder {
                         }
                         type+=">";
                 }
+               
             default:   
         }
         return type;    
@@ -63,19 +73,28 @@ class Builder {
         var body:String=Std.format('{super("$clazzName",Type.resolveClass("$clazzFullName"),"","");');
         for (field in fields){
             var type=getVarTypeName(field);
-            //trace(field.meta);
+                       
+
           
             if (type!=null){
+                
+                var tt=Context.typeof(Context.parse("{ var _:" + type +"; _; }", Context.currentPos()));
+                        
+                tt=Context.follow(tt,false);
+                            
+                type=getTypeName(TypeTools.toComplex(tt,true));
+                
+                        
                 body+=Std.format('\nthis.${field.name} = new introspector.FieldIntrospector<$clazzFullName,$type>(
                         "${field.name}",
                         Type.resolveClass("$type"),
                         true,
                         ${metaDynamification(field.meta)},
                         "${field.doc}",
-                        function(instance:$clazzFullName,value:$type){
+                        inline function(instance:$clazzFullName,value:$type){
                             instance.${field.name} = value;
                         },
-                        function(instance:$clazzFullName):$type{
+                        inline function(instance:$clazzFullName):$type{
                             return instance.${field.name};
                         }
                     );
@@ -175,7 +194,16 @@ class Builder {
             
         });
     }
+
+
+    
+
+
+
+
+
     private static function addFieldDeclarations(introspectorFields:Array<Field>){
+       
         var fields:Array<Field> = Context.getBuildFields();
         var modelClazz=Context.getLocalClass().get();
 
@@ -183,35 +211,48 @@ class Builder {
         var pos = Context.currentPos();
         for (field in fields){
             if (field.name!=null && field.access.exists(APublic)){
-                
-                var type;
-                switch (field.kind){
-                    case FVar( t , e):
+               
+                    var type;
+                    switch (field.kind){
+                        case FVar( t , e):
+                            
+                            type=t;
+                        case FProp( get , set , t, e):
+                            
+                            type=t;
+                        default:
+                            type=null;
+                    }
+                    if (type!=null){
                         
-                        type=t;
-                    case FProp( get , set , t, e):
+                        var tt=Context.typeof(Context.parse("{ var _:" + getTypeName(type) +"; _; }", pos));
                         
-                        type=t;
-                    default:
-                        type=null;
-                }
-                
-                if (type!=null)
-                    introspectorFields.push({
-                        name : field.name,
-                        access : [Access.APublic],
-                        kind : FieldType.FVar(TPath({ pack : ["introspector"], name : "FieldIntrospector", params : [TPType(tClazz),TPType(type)], sub : null })),
-                        pos : pos
+                        tt=Context.follow(tt,false);
                         
-                    });
+                        type=TypeTools.toComplex(tt,true);
+                        
+
+
+                         
+                        introspectorFields.push({
+                            name : field.name,
+                            access : [Access.APublic],
+                            kind : FieldType.FVar(TPath({ pack : ["introspector"], name : "FieldIntrospector", params : [TPType(tClazz),TPType(type)], sub : null })),
+                            pos : pos
+                            
+                        });
+                       
+                    }
             }
         }
+      
         return introspectorFields;
     }
 
 
 
     @:macro public static function build() : Array<Field> {
+       
         var pos = Context.currentPos();
         var fields = Context.getBuildFields();
         
@@ -223,9 +264,12 @@ class Builder {
         var tString=TPath({ pack : [], name : "String", params : [], sub : null });
         var introspectorFields=new Array<Field>();
         
-        addFieldDeclarations(introspectorFields);
-        addConstructor(introspectorFields,modelClazz.name,clazzFullName);
 
+        
+        addFieldDeclarations(introspectorFields);
+        
+        addConstructor(introspectorFields,modelClazz.name,clazzFullName);
+        
         //define new type
 
         Context.defineType({
